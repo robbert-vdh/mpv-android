@@ -7,8 +7,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 
 /*
@@ -24,6 +26,9 @@ class BackgroundPlaybackService : Service(), EventObserver {
         MPVLib.observeProperty("metadata/by-key/Artist", MPVLib.mpvFormat.MPV_FORMAT_STRING)
         MPVLib.observeProperty("metadata/by-key/Album", MPVLib.mpvFormat.MPV_FORMAT_STRING)
     }
+
+    private lateinit var wakeLock: PowerManager.WakeLock
+    private lateinit var wifiLock: WifiManager.MulticastLock
 
     private var cachedMediaTitle: String? = null
     private var cachedMediaArtist: String? = null
@@ -72,6 +77,14 @@ class BackgroundPlaybackService : Service(), EventObserver {
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         Log.v(TAG, "BackgroundPlaybackService: starting")
 
+        // acquire shitty locks
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG)
+        wakeLock.acquire()
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        wifiLock = wifiManager.createMulticastLock(TAG)
+        wifiLock.acquire()
+
         // read some metadata
 
         cachedMediaTitle = MPVLib.getPropertyString("media-title")
@@ -94,6 +107,8 @@ class BackgroundPlaybackService : Service(), EventObserver {
 
     override fun onDestroy() {
         MPVLib.removeObserver(this)
+        wakeLock.release()
+        wifiLock.release()
 
         Log.v(TAG, "BackgroundPlaybackService: destroyed")
     }
