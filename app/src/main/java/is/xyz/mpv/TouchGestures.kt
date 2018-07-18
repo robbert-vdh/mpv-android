@@ -10,6 +10,7 @@ enum class PropertyChange {
     SeekSub,
     Volume,
     Bright,
+    SubHeight,
     Finalize
 }
 
@@ -25,6 +26,7 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
         ControlSeek,
         ControlVolume,
         ControlBright,
+        ControlSubHeight
     }
 
     private var state = State.Up
@@ -76,16 +78,22 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
                     if (inSubtitleArea) {
                         sendPropertyChange(PropertyChange.SeekSub, if (dx > 0) -1f else 1f)
 
+                        // This gesture is a one-off, so we should stop listening for other gestures immediatly
                         state = State.Up
                     } else {
                         state = State.ControlSeek
                     }
                 } else if (Math.abs(dy) > trigger) {
-                    // depending on left/right side we might want volume or brightness control
-                    if (initialPos.x > width / 2)
-                        state = State.ControlVolume
-                    else
-                        state = State.ControlBright
+                    if (inSubtitleArea) {
+                        state = State.ControlSubHeight;
+                    } else {
+                        // depending on left/right side we might want volume or brightness control
+                        if (initialPos.x > width / 2) {
+                            state = State.ControlVolume
+                        } else {
+                            state = State.ControlBright
+                        }
+                    }
                 }
 
                 // send Init so that it has a chance to cache values before we start modifying them
@@ -99,6 +107,8 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
                 sendPropertyChange(PropertyChange.Volume, -CONTROL_VOLUME_MAX * dy / height)
             State.ControlBright ->
                 sendPropertyChange(PropertyChange.Bright, -CONTROL_BRIGHT_MAX * dy / height)
+            State.ControlSubHeight ->
+                sendPropertyChange(PropertyChange.SubHeight, -CONTROL_SUBHEIGHT_MAX * dy / height)
         }
         return state != State.Up && state != State.Down
     }
@@ -139,5 +149,7 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
          * performed below this vertical threshold will be used for manipulation the subtitles.
          */
         private const val SUBTITLE_AREA_THRESHOLD = 0.7;
+
+        private const val CONTROL_SUBHEIGHT_MAX = 100f
     }
 }

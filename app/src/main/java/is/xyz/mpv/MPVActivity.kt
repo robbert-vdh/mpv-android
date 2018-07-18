@@ -31,7 +31,10 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.*
+import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.truncate
 
 class MPVActivity : Activity(), EventObserver, TouchGesturesObserver {
     private lateinit var fadeHandler: Handler
@@ -636,20 +639,24 @@ class MPVActivity : Activity(), EventObserver, TouchGesturesObserver {
         }
     }
 
+    private var lastDiff = 0f
     private var initialSeek = 0
     private var initialBright = 0f
     private var initialVolume = 0
     private var maxVolume = 0
+    private var subHeightDiff = 0f
 
     override fun onPropertyChange(p: PropertyChange, diff: Float) {
         when (p) {
             PropertyChange.Init -> {
                 mightWantToToggleControls = false
 
+                lastDiff = 0f
                 initialSeek = player.timePos ?: -1
                 initialBright = getInitialBrightness()
                 initialVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                 maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                subHeightDiff = 0f
 
                 gestureTextView.visibility = View.VISIBLE
                 gestureTextView.text = ""
@@ -670,6 +677,7 @@ class MPVActivity : Activity(), EventObserver, TouchGesturesObserver {
             PropertyChange.SeekSub -> {
                 val offset = diff.roundToInt();
 
+                // TODO: Add an OSD message here
                 MPVLib.command(arrayOf("sub-seek", offset.toString()))
             }
             PropertyChange.Volume -> {
@@ -687,8 +695,28 @@ class MPVActivity : Activity(), EventObserver, TouchGesturesObserver {
 
                 gestureTextView.text = "B: ${Math.round(newBright * 100)}%"
             }
+            PropertyChange.SubHeight -> {
+                subHeightDiff += lastDiff - diff
+
+                // TODO: This only works with `--sub-ass-override=scale`, this should probably be set as the default
+                //       somewhere else
+                MPVLib.command(arrayOf("set", "sub-ass-override", "scale"))
+
+                // mpv does accept float values for properties, but rounding would cause a bias in one direction
+                val integerChange = truncate(subHeightDiff).toInt()
+                if (integerChange !== 0) {
+                    // TODO: Add an OSD message here
+                    // The argument here should always include a sign, even if the number is positive
+                    MPVLib.command(arrayOf("add", "sub-pos", "%+d".format(Locale.US, integerChange)))
+
+                    subHeightDiff -= integerChange
+                }
+            }
+            // TODO: Add a gesture for subtitle scale
             PropertyChange.Finalize -> gestureTextView.visibility = View.GONE
         }
+
+        lastDiff = diff
     }
 
     companion object {
