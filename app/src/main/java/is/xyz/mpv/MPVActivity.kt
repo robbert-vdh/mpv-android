@@ -31,6 +31,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import kotlin.math.roundToInt
 
 class MPVActivity : Activity(), EventObserver, TouchGesturesObserver {
     private lateinit var fadeHandler: Handler
@@ -665,6 +666,11 @@ class MPVActivity : Activity(), EventObserver, TouchGesturesObserver {
 
                 val diffText = (if (newDiff >= 0) "+" else "-") + prettyTime(Math.abs(newDiff.toInt()))
                 gestureTextView.text = "${prettyTime(newPos)}\n[$diffText]"
+            }
+            PropertyChange.SeekSub -> {
+                val offset = diff.roundToInt();
+
+                MPVLib.command(arrayOf("sub-seek", offset.toString()))
             }
             PropertyChange.Volume -> {
                 val newVolume = Math.min(Math.max(0, initialVolume + (diff * maxVolume).toInt()), maxVolume)

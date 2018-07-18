@@ -7,6 +7,7 @@ import java.lang.Math
 enum class PropertyChange {
     Init,
     Seek,
+    SeekSub,
     Volume,
     Bright,
     Finalize
@@ -64,11 +65,21 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
         val dy = p.y - initialPos.y
 
         when (state) {
-            State.Up -> {}
+            State.Up -> {
+            }
             State.Down -> {
+                val inSubtitleArea = p.y > height * SUBTITLE_AREA_THRESHOLD
+
                 // we might get into one of Control states if user moves enough
                 if (Math.abs(dx) > trigger) {
-                    state = State.ControlSeek
+                    // Horizontal gestures in the bottom of the screen should seek to the next/previous subtitle
+                    if (inSubtitleArea) {
+                        sendPropertyChange(PropertyChange.SeekSub, if (dx > 0) -1f else 1f)
+
+                        state = State.Up
+                    } else {
+                        state = State.ControlSeek
+                    }
                 } else if (Math.abs(dy) > trigger) {
                     // depending on left/right side we might want volume or brightness control
                     if (initialPos.x > width / 2)
@@ -76,9 +87,11 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
                     else
                         state = State.ControlBright
                 }
+
                 // send Init so that it has a chance to cache values before we start modifying them
-                if (state != State.Down)
+                if (state != State.Down) {
                     sendPropertyChange(PropertyChange.Init, 0f)
+                }
             }
             State.ControlSeek ->
                 sendPropertyChange(PropertyChange.Seek, CONTROL_SEEK_MAX * dx / width)
@@ -118,5 +131,13 @@ class TouchGestures(val width: Float, val height: Float, val observer: TouchGest
             }
         }
         return gestureHandled
+    }
+
+    companion object {
+        /**
+         * The percentage of the screen's height (counted from the top) that is not part of the subtitle area. Gestures
+         * performed below this vertical threshold will be used for manipulation the subtitles.
+         */
+        private const val SUBTITLE_AREA_THRESHOLD = 0.7;
     }
 }
